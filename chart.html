@@ -11,24 +11,39 @@
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
   <style>
-    body {
+    /* Remove default margins and prevent scrollbars in iframe */
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
       font-family: Arial, Helvetica, sans-serif;
-      padding: 20px;
       background: #fafafa;
     }
-    canvas {
-      max-width: 900px;
-      background: white;
-      border: 1px solid #ccc;
+
+    /* Make the canvas always fill the iframe container */
+    #container {
+      width: 100%;
+      height: 100%;
       padding: 10px;
+      box-sizing: border-box;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
       border-radius: 6px;
+      background: #fff;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
     }
   </style>
 </head>
 
 <body>
-  <h2>Monthly Collections & Cumulative Chart</h2>
+<div id="container">
   <canvas id="lineChart"></canvas>
+</div>
 
 <script>
 
@@ -53,29 +68,23 @@ function plot(csvText) {
   const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
   const rows = parsed.data;
 
-  // Find fields
   const headers = Object.keys(rows[0]).map(h => h.trim().toLowerCase());
   const monthField = headers.find(h => /month/.test(h));
   const monthlyField = headers.find(h => /monthly/.test(h));
   const cumulativeField = headers.find(h => /cumul/.test(h));
   const monthOrderField = headers.find(h => /order/.test(h));
 
-  // Build table
-  const table = rows.map((r, idx) => {
-    return {
-      month: r[Object.keys(r)[headers.indexOf(monthField)]],
-      monthly: cleanNumber(r[Object.keys(r)[headers.indexOf(monthlyField)]]),
-      cumulative: cleanNumber(r[Object.keys(r)[headers.indexOf(cumulativeField)]]),
-      monthOrder: monthOrderField
-        ? parseInt(r[Object.keys(r)[headers.indexOf(monthOrderField)]])
-        : idx + 1
-    };
-  });
+  const table = rows.map((r, idx) => ({
+    month: r[Object.keys(r)[headers.indexOf(monthField)]],
+    monthly: cleanNumber(r[Object.keys(r)[headers.indexOf(monthlyField)]]),
+    cumulative: cleanNumber(r[Object.keys(r)[headers.indexOf(cumulativeField)]]),
+    monthOrder: monthOrderField
+      ? parseInt(r[Object.keys(r)[headers.indexOf(monthOrderField)]])
+      : idx + 1
+  }));
 
-  // Sort by order
   table.sort((a, b) => a.monthOrder - b.monthOrder);
 
-  // Prepare data
   const labels = table.map(t => t.month);
   const monthlyData = table.map(t => t.monthly);
   const cumulativeData = table.map(t => t.cumulative);
@@ -105,6 +114,7 @@ function plot(csvText) {
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { position: "top" }
       },
@@ -116,14 +126,14 @@ function plot(csvText) {
   });
 }
 
-// Auto-load CSV when page loads
 fetch(CSV_URL)
   .then(r => r.text())
   .then(plot)
   .catch(err => {
-    document.body.innerHTML += `<p style="color:red;">Error loading CSV: ${err}</p>`;
+    document.body.innerHTML += `<p style="color:red;padding:10px;">Error loading CSV: ${err}</p>`;
   });
 
 </script>
+
 </body>
 </html>
