@@ -7,35 +7,35 @@
     margin: 0;
     padding: 0;
     height: 100%;
+    width: 100%;
     background: transparent;
     font-family: Arial, sans-serif;
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    display: block; /* fill iframe instead of center */
   }
 
   .kpi-box {
-    padding: 2vh 3vw;
+    width: 100%;
+    height: 100%;
+    padding: 2vh 2vw;
     background: #e8f5e9;
     border: 2px solid #43a047;
     border-radius: 12px;
-    text-align: center;
-    width: 90%;
-    max-width: 500px;
     box-sizing: border-box;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* center text inside box, not iframe */
   }
 
-  /* Responsive big number */
   .kpi-value {
-    font-size: clamp(28px, 6vw, 60px);
+    font-size: clamp(32px, 8vw, 72px);
     font-weight: bold;
     color: #1b5e20;
     line-height: 1.1;
   }
 
-  /* Responsive label text */
   .kpi-label {
-    font-size: clamp(14px, 2vw, 22px);
+    font-size: clamp(16px, 3vw, 26px);
     color: #2e7d32;
     margin-top: 8px;
   }
