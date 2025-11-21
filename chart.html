@@ -2,139 +2,105 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>Line chart from CSV (Monthly Collections)</title>
+  <title>Auto Line Chart</title>
+
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- PapaParse for CSV parsing -->
+
+  <!-- PapaParse for CSV -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; padding: 18px; background:#fafafa; }
-    .controls { margin-bottom:12px; }
-    canvas { max-width:900px; background:white; border:1px solid #ddd; padding:10px; }
-    label { display:inline-block; margin-right:8px; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 20px;
+      background: #fafafa;
+    }
+    canvas {
+      max-width: 900px;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 6px;
+    }
   </style>
 </head>
+
 <body>
-  <h2>Line chart from CSV — Monthly Collections & Cumulative</h2>
-
-  <div class="controls">
-    <label>Upload CSV: <input id="fileInput" type="file" accept=".csv"></label>
-    <label>Or use URL: <input id="urlInput" type="text" size="50" placeholder="Enter CSV URL (or local path served by webserver)"></label>
-    <button id="loadUrl">Load URL</button>
-    <button id="useExample">Use embedded example data</button>
-  </div>
-
-  <canvas id="lineChart" width="900" height="400"></canvas>
+  <h2>Monthly Collections & Cumulative Chart</h2>
+  <canvas id="lineChart"></canvas>
 
 <script>
-/*
-  Notes:
-  - CSV must contain columns for Month, Monthly_Collections, Cumulative_Data_Points (case-insensitive).
-  - Month can be "Jan-25" etc. If Month isn't chronological, the script will use "MonthOrder" if present,
-    or create an order based on appearance.
-  - If numbers use comma for decimal like "1,25", they'll be converted to "1.25".
-  - If you prefer to fetch a hosted file, replace DATA_URL below with your hosted CSV URL (or a server path).
-  - Developer-provided example path (replace with actual CSV if hosted): /mnt/data/Screenshot 2025-11-21 at 08.56.04.png
-*/
+
+// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+// REPLACE THIS WITH YOUR CSV URL FROM GITHUB PAGES
+// Example:
+// const CSV_URL = "https://yourusername.github.io/yourrepo/data.csv";
+const CSV_URL = "https://yourusername.github.io/yourrepo/data.csv";
+// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 const ctx = document.getElementById('lineChart').getContext('2d');
 let chart = null;
 
 function cleanNumber(s) {
-  if (s === null || s === undefined) return NaN;
-  // remove spaces, convert comma decimals to dot, remove thousands separators if any
+  if (!s) return NaN;
   s = String(s).trim();
-  // handle numbers like "1,25" -> "1.25", but also "1,000" (ambiguous). We'll assume comma used for decimals if there's only one comma and no dot.
-  if (s === '') return NaN;
-  // If both comma and dot exist, remove thousands separators (commas) and keep decimal dot
-  if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
-    s = s.replace(/,/g, '');
-  } else if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) {
-    // replace comma with dot (1,25 -> 1.25)
-    s = s.replace(',', '.');
-  } else {
-    // leave as-is
+  if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) {
+    s = s.replace(',', '.'); // "1,25" → "1.25"
   }
-  // remove any non-numeric chars except dot and minus
   s = s.replace(/[^\d\.\-]/g, '');
-  const n = parseFloat(s);
-  return Number.isFinite(n) ? n : NaN;
+  return parseFloat(s);
 }
 
-function parseAndPlot(csvText) {
-  const parsed = Papa.parse(csvText, {header:true, skipEmptyLines:true});
-  if (parsed.errors && parsed.errors.length) {
-    console.warn('CSV parse errors', parsed.errors);
-  }
+function plot(csvText) {
+  const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
   const rows = parsed.data;
-  if (!rows.length) {
-    alert('No rows found in the CSV.');
-    return;
-  }
 
-  // Normalize headers: find fields
-  const headers = Object.keys(rows[0]).map(h=>h.trim().toLowerCase());
-  // possible names:
+  // Find fields
+  const headers = Object.keys(rows[0]).map(h => h.trim().toLowerCase());
   const monthField = headers.find(h => /month/.test(h));
-  const monthlyField = headers.find(h => /monthly.*collect|monthly_col|monthlycollections|monthly_collections|monthly collection/i.test(h));
-  const cumulativeField = headers.find(h => /cumul|cumulative/.test(h));
-  const monthOrderField = headers.find(h => /monthorder|month_order|monthorderfield/.test(h));
+  const monthlyField = headers.find(h => /monthly/.test(h));
+  const cumulativeField = headers.find(h => /cumul/.test(h));
+  const monthOrderField = headers.find(h => /order/.test(h));
 
-  if (!monthField) {
-    alert('Cannot find a Month column (header containing "month"). Check your CSV headers.');
-    return;
-  }
-  if (!monthlyField && !cumulativeField) {
-    alert('Cannot find Monthly_Collections or Cumulative_Data_Points column. Check headers.');
-    return;
-  }
-
-  // Build an array with cleaned values
+  // Build table
   const table = rows.map((r, idx) => {
-    const month = r[Object.keys(r)[headers.indexOf(monthField)]].toString().trim();
-    const monthlyRaw = monthlyField ? r[Object.keys(r)[headers.indexOf(monthlyField)]] : null;
-    const cumulativeRaw = cumulativeField ? r[Object.keys(r)[headers.indexOf(cumulativeField)]] : null;
-    const monthOrderRaw = monthOrderField ? r[Object.keys(r)[headers.indexOf(monthOrderField)]] : null;
     return {
-      month,
-      monthly: monthlyRaw !== null ? cleanNumber(monthlyRaw) : NaN,
-      cumulative: cumulativeRaw !== null ? cleanNumber(cumulativeRaw) : NaN,
-      monthOrder: monthOrderRaw ? parseInt(String(monthOrderRaw).trim()) : (idx+1)
+      month: r[Object.keys(r)[headers.indexOf(monthField)]],
+      monthly: cleanNumber(r[Object.keys(r)[headers.indexOf(monthlyField)]]),
+      cumulative: cleanNumber(r[Object.keys(r)[headers.indexOf(cumulativeField)]]),
+      monthOrder: monthOrderField
+        ? parseInt(r[Object.keys(r)[headers.indexOf(monthOrderField)]])
+        : idx + 1
     };
   });
 
-  // Sort by monthOrder if numeric
-  table.sort((a,b) => (a.monthOrder||0) - (b.monthOrder||0));
+  // Sort by order
+  table.sort((a, b) => a.monthOrder - b.monthOrder);
 
-  // Labels and datasets
+  // Prepare data
   const labels = table.map(t => t.month);
-  const monthlyData = table.map(t => Number.isFinite(t.monthly) ? t.monthly : null);
-  const cumulativeData = table.map(t => Number.isFinite(t.cumulative) ? t.cumulative : null);
+  const monthlyData = table.map(t => t.monthly);
+  const cumulativeData = table.map(t => t.cumulative);
 
-  // Destroy existing chart if exists
   if (chart) chart.destroy();
-
   chart = new Chart(ctx, {
-    type: 'line',
+    type: "line",
     data: {
       labels: labels,
       datasets: [
         {
-          label: 'Monthly Collections',
+          label: "Monthly Collections",
           data: monthlyData,
           tension: 0.25,
-          fill: false,
-          spanGaps: true,
           borderWidth: 2,
           pointRadius: 3
         },
         {
-          label: 'Cumulative Data Points',
+          label: "Cumulative",
           data: cumulativeData,
           tension: 0.25,
-          fill: false,
-          spanGaps: true,
-          borderDash: [6,4],
+          borderDash: [6, 4],
           borderWidth: 2,
           pointRadius: 3
         }
@@ -143,65 +109,24 @@ function parseAndPlot(csvText) {
     options: {
       responsive: true,
       plugins: {
-        tooltip: { mode: 'index', intersect: false },
-        legend: { position: 'top' }
+        legend: { position: "top" }
       },
-      interaction: { mode: 'nearest', axis: 'x', intersect: false },
       scales: {
-        x: { title: { display: true, text: 'Month' } },
-        y: { title: { display: true, text: 'Value' }, beginAtZero: false }
+        x: { title: { display: true, text: "Month" } },
+        y: { title: { display: true, text: "Value" } }
       }
     }
   });
 }
 
-document.getElementById('fileInput').addEventListener('change', function(e){
-  const f = e.target.files[0];
-  if (!f) return;
-  Papa.parse(f, {
-    header: true,
-    skipEmptyLines: true,
-    complete: function(results) {
-      parseAndPlot(Papa.unparse(results.data)); // reserialize to string (or pass original file text)
-    },
-    error: function(err) { alert('Error reading file: ' + err); }
+// Auto-load CSV when page loads
+fetch(CSV_URL)
+  .then(r => r.text())
+  .then(plot)
+  .catch(err => {
+    document.body.innerHTML += `<p style="color:red;">Error loading CSV: ${err}</p>`;
   });
-});
 
-document.getElementById('loadUrl').addEventListener('click', async () => {
-  const url = document.getElementById('urlInput').value.trim();
-  if (!url) { alert('Enter a CSV URL or a local path served by a webserver.'); return; }
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const text = await resp.text();
-    parseAndPlot(text);
-  } catch (err) {
-    alert('Failed to fetch URL: ' + err.message + '\nIf your file is local, consider using the file upload control instead.');
-  }
-});
-
-document.getElementById('useExample').addEventListener('click', () => {
-  // small embedded CSV example matching your requested layout
-  const exampleCsv = `Month,Monthly_Collections,Cumulative_Data_Points
-Jan-25,850,15
-Feb-25,900,22.5
-Mar-25,1000,31
-Apr-25,1100,40.5
-May-25,1250,52
-Jun-25,1350,64.5
-Jul-25,1500,78
-Aug-25,1650,92.5
-Sep-25,1750,100
-Oct-25,1850,108
-`;
-  parseAndPlot(exampleCsv);
-});
-
-/* --- Example: If you have a server-hosted CSV, set its URL here (replace below) ---
-const DATA_URL = '/mnt/data/Screenshot 2025-11-21 at 08.56.04.png'; // <-- replace with hosted CSV path
-fetch(DATA_URL).then(r=>r.text()).then(parseAndPlot).catch(e=>console.error(e));
-*/
 </script>
 </body>
 </html>
