@@ -1,65 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Auto Line Chart</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #fafafa;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    #container {
+      width: 100%;
+      height: 100%;
+      min-height: 360px;   /* <- prevent blank */
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      border-radius: 6px;
+      background: white;
+      border: 1px solid #ccc;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+
+<body>
+<div id="container">
+  <canvas id="lineChart"></canvas>
+</div>
+
 <script>
-
-// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 const CSV_URL = "https://hxrnedserpent.github.io/chartbuilder/collectiontrend.csv";
-// <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-
-const ctx = document.getElementById('lineChart').getContext('2d');
-let chart = null;
 
 function cleanNumber(s) {
   if (!s) return NaN;
   s = String(s).trim();
-  if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) {
-    s = s.replace(',', '.'); // "1,25" → "1.25"
-  }
-  s = s.replace(/[^\d\.\-]/g, '');
-  return parseFloat(s);
+  if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) s = s.replace(',', '.');
+  return parseFloat(s.replace(/[^\d\.\-]/g, ''));
 }
 
 function plot(csvText) {
   const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
   const rows = parsed.data;
 
-  const headers = Object.keys(rows[0]).map(h => h.trim().toLowerCase());
+  const headers = Object.keys(rows[0]).map(h => h.toLowerCase());
   const monthField = headers.find(h => /month/.test(h));
   const monthlyField = headers.find(h => /monthly/.test(h));
   const cumulativeField = headers.find(h => /cumul/.test(h));
   const monthOrderField = headers.find(h => /order/.test(h));
 
-  const table = rows.map((r, idx) => ({
+  const table = rows.map((r, i) => ({
     month: r[Object.keys(r)[headers.indexOf(monthField)]],
     monthly: cleanNumber(r[Object.keys(r)[headers.indexOf(monthlyField)]]),
     cumulative: cleanNumber(r[Object.keys(r)[headers.indexOf(cumulativeField)]]),
-    monthOrder: monthOrderField
+    order: monthOrderField
       ? parseInt(r[Object.keys(r)[headers.indexOf(monthOrderField)]])
-      : idx + 1
+      : i + 1
   }));
 
-  table.sort((a, b) => a.monthOrder - b.monthOrder);
+  table.sort((a, b) => a.order - b.order);
 
-  const labels = table.map(t => t.month);
-  const monthlyData = table.map(t => t.monthly);
-  const cumulativeData = table.map(t => t.cumulative);
-
-  if (chart) chart.destroy();
-  chart = new Chart(ctx, {
+  new Chart(document.getElementById('lineChart').getContext('2d'), {
     type: "line",
     data: {
-      labels: labels,
+      labels: table.map(t => t.month),
       datasets: [
         {
           label: "Monthly Data Collections",
-          data: monthlyData,
+          data: table.map(t => t.monthly),
           tension: 0.25,
           borderWidth: 2,
           pointRadius: 3
         },
         {
           label: "Cumulative Data Points",
-          data: cumulativeData,
+          data: table.map(t => t.cumulative),
           tension: 0.25,
-          borderDash: [6, 4],
+          borderDash: [6,4],
           borderWidth: 2,
           pointRadius: 3
         }
@@ -69,17 +98,12 @@ function plot(csvText) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: "top" },
         title: {
           display: true,
           text: "Data Collection Trend",
-          font: { size: 18, weight: "bold" },
-          padding: { top: 10, bottom: 20 }
-        }
-      },
-      scales: {
-        x: { title: { display: true, text: "Month" } },
-        y: { title: { display: true, text: "Value" } }
+          font: { size: 18, weight: "bold" }
+        },
+        legend: { position: "top" }
       }
     }
   });
@@ -89,7 +113,9 @@ fetch(CSV_URL)
   .then(r => r.text())
   .then(plot)
   .catch(err => {
-    document.body.innerHTML += `<p style="color:red;padding:10px;">Error loading CSV: ${err}</p>`;
+    document.body.innerHTML = "<p style='color:red;padding:10px;'>Error loading CSV: " + err + "</p>";
   });
-
 </script>
+
+</body>
+</html>
